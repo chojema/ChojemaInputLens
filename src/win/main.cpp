@@ -241,16 +241,16 @@ void ShowAbout() {
                               L"입력한 내용을 저장하거나 전송하지 않습니다.\n"
                               L"Input is never stored or sent anywhere.\n\n"
                               L"Copyright (c) 2026 Chulwoo Park";
-    MessageBoxW(g.hwnd, text.c_str(), L"정보 (About)", MB_OK | MB_ICONINFORMATION);
+    MessageBoxW(g.hwnd, text.c_str(), L"정보(About)", MB_OK | MB_ICONINFORMATION);
 }
 
 void ShowTrayMenu(POINT at) {
     HMENU menu = CreatePopupMenu();
-    AppendMenuW(menu, MF_STRING | (g.paused ? MF_CHECKED : 0), kMenuPause, L"일시정지 (Pause)");
-    AppendMenuW(menu, MF_STRING | (g.showMouse ? MF_CHECKED : 0), kMenuMouse, L"마우스 표시 (Show mouse)");
+    AppendMenuW(menu, MF_STRING | (g.paused ? MF_CHECKED : 0), kMenuPause, L"일시정지(Pause)");
+    AppendMenuW(menu, MF_STRING | (g.showMouse ? MF_CHECKED : 0), kMenuMouse, L"마우스 표시(Show mouse)");
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(menu, MF_STRING, kMenuAbout, L"정보 (About)");
-    AppendMenuW(menu, MF_STRING, kMenuExit, L"종료 (Exit)");
+    AppendMenuW(menu, MF_STRING, kMenuAbout, L"정보(About)");
+    AppendMenuW(menu, MF_STRING, kMenuExit, L"종료(Exit)");
 
     SetForegroundWindow(g.hwnd);  // Required so the menu closes on an outside click.
     const UINT id = TrackPopupMenuEx(menu, TPM_RETURNCMD | TPM_NONOTIFY | TPM_RIGHTBUTTON, at.x, at.y, g.hwnd, nullptr);

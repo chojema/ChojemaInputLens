@@ -153,16 +153,7 @@ void Overlay::OnTimer(UINT_PTR id) {
         renderPending_ = false;
         KillTimer(hwnd_, kTimerFade);
         alpha_ = 255;
-        {
-            LARGE_INTEGER begin, end, frequency;
-            QueryPerformanceCounter(&begin);
-            Render();
-            QueryPerformanceCounter(&end);
-            QueryPerformanceFrequency(&frequency);
-            const double ms = (end.QuadPart - begin.QuadPart) * 1000.0 / frequency.QuadPart;
-            if (renderCount_ == 1) firstRenderMs_ = ms;
-            maxRenderMs_ = max(maxRenderMs_, ms);
-        }
+        Render();
         SetTimer(hwnd_, kTimerHold, kHoldMs, nullptr);
         break;
     case kTimerHold:
@@ -186,7 +177,6 @@ void Overlay::OnTimer(UINT_PTR id) {
 
 void Overlay::Render() {
     using namespace Gdiplus;
-    ++renderCount_;
 
     POINT cursor{};
     GetCursorPos(&cursor);

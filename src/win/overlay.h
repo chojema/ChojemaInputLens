@@ -2,7 +2,9 @@
 #include <string>
 #include <windows.h>
 
-enum class MouseGlyph { None, Left, Right, Middle, Back, Forward, WheelUp, WheelDown, WheelLeft, WheelRight };
+#include "input_tracker.h"
+
+using inputlens::MouseGlyph;
 
 // A click-through, never-focused window that shows one short label and fades out.
 // It runs no timers while hidden.
@@ -13,9 +15,6 @@ public:
     // Draws prefix, then the mouse image if any, then suffix.
     void Show(std::wstring prefix, MouseGlyph glyph = MouseGlyph::None, std::wstring suffix = {});
     void Hide();
-    unsigned long long RenderCount() const { return renderCount_; }
-    double FirstRenderMs() const { return firstRenderMs_; }
-    double MaxRenderMs() const { return maxRenderMs_; }
 
 private:
     static LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
@@ -30,7 +29,4 @@ private:
     MouseGlyph glyph_ = MouseGlyph::None;
     int alpha_ = 255;
     bool renderPending_ = false;
-    unsigned long long renderCount_ = 0;
-    double firstRenderMs_ = 0;
-    double maxRenderMs_ = 0;
 };

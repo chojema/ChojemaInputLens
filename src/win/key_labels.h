@@ -1,12 +1,17 @@
 #pragma once
+#include <optional>
 #include <string>
 #include <windows.h>
 
+#include "input_tracker.h"
+
 void SetKeyLabelsEnglish(bool english);
 
-// Label for a key shown on its own: function, navigation and IME keys.
-// Returns nullptr for keys that produce text, which are not shown by themselves.
-const wchar_t* StandaloneKeyLabel(UINT vk, bool extended);
+// Translates a Raw Input key. Returns nothing for the synthetic codes Windows emits around other keys.
+std::optional<inputlens::KeyEvent> TranslateKey(UINT vk, bool extended, bool up);
 
-// Label for any non-modifier key used inside a combination such as Ctrl + C.
-std::wstring ComboKeyLabel(UINT vk, bool extended);
+// Bits of the tracked modifiers that are still physically held.
+uint8_t HeldModifiers(uint8_t tracked);
+
+// Text before the mouse image, or the full key label when there is no image.
+std::wstring DisplayPrefix(const inputlens::Display& display);

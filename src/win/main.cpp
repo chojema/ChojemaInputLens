@@ -8,9 +8,6 @@
 #include "resource.h"
 #include "version.h"
 
-#ifdef INPUTLENS_METRICS
-#include <cstdio>
-#endif
 
 namespace {
 
@@ -18,8 +15,6 @@ constexpr wchar_t kMainClass[] = L"ChojemaInputLensMain";
 constexpr wchar_t kAppName[] = L"Chojema InputLens";
 constexpr UINT WM_APP_TRAY = WM_APP + 1;
 constexpr UINT kTrayId = 1;
-constexpr ULONGLONG kMergeWindowMs = 700;
-constexpr ULONGLONG kModifierTapMs = 1000;
 
 enum MenuId : UINT { kMenuPause = 1, kMenuMouse, kMenuKorean, kMenuEnglish, kMenuAbout, kMenuExit };
 
@@ -35,22 +30,10 @@ struct App {
     bool showMouse = true;
     bool english = false;
 
-    bool ctrl = false, alt = false, shift = false, win = false;
-    UINT tapCandidate = 0;
-    ULONGLONG tapStart = 0;
-
-    std::wstring lastLabel;
-    MouseGlyph lastGlyph = MouseGlyph::None;
-    ULONGLONG lastTime = 0;
-    int repeat = 0;
+    inputlens::InputTracker tracker;
     int wheelSum = 0;
+    int hwheelSum = 0;
 
-#ifdef INPUTLENS_METRICS
-    // Counters only. Key identities and labels are never recorded.
-    std::wstring metricsPath;
-    unsigned long long inputs = 0, mouseDropped = 0, keyboardEvents = 0, shown = 0;
-    long long handlerTicksTotal = 0, handlerTicksMax = 0;
-#endif
 } g;
 
 const wchar_t* T(const wchar_t* korean, const wchar_t* english) { return g.english ? english : korean; }
@@ -73,130 +56,47 @@ void SetLanguage(bool english) {
                     static_cast<DWORD>((wcslen(value) + 1) * sizeof(wchar_t)));
 }
 
-bool* ModifierFlag(UINT vk) {
-    switch (vk) {
-    case VK_CONTROL: return &g.ctrl;
-    case VK_MENU: return &g.alt;
-    case VK_SHIFT: return &g.shift;
-    case VK_LWIN:
-    case VK_RWIN: return &g.win;
-    default: return nullptr;
-    }
-}
-
-const wchar_t* ModifierName(UINT vk) {
-    switch (vk) {
-    case VK_CONTROL: return L"Ctrl";
-    case VK_MENU: return L"Alt";
-    case VK_SHIFT: return L"Shift";
-    default: return L"Win";
-    }
+void Present(const std::optional<inputlens::Display>& display) {
+    if (!display) return;
+    g.overlay.Show(DisplayPrefix(*display), display->glyph,
+                   display->count > 1 ? L" ×" + std::to_wstring(display->count) : std::wstring());
 }
 
 // Key-up can be lost when the secure desktop takes over, such as on Win+L.
 void ReconcileModifiers() {
-    const auto released = [](int vk) { return (GetAsyncKeyState(vk) & 0x8000) == 0; };
-    if (g.ctrl && released(VK_CONTROL)) g.ctrl = false;
-    if (g.alt && released(VK_MENU)) g.alt = false;
-    if (g.shift && released(VK_SHIFT)) g.shift = false;
-    if (g.win && released(VK_LWIN) && released(VK_RWIN)) g.win = false;
-}
-
-std::wstring ModifierPrefix() {
-    std::wstring prefix;
-    if (g.ctrl) prefix += L"Ctrl + ";
-    if (g.alt) prefix += L"Alt + ";
-    if (g.shift) prefix += L"Shift + ";
-    if (g.win) prefix += L"Win + ";
-    return prefix;
-}
-
-void Present(const std::wstring& label, MouseGlyph glyph = MouseGlyph::None, int amount = 1) {
-    const ULONGLONG now = GetTickCount64();
-    if (label == g.lastLabel && glyph == g.lastGlyph && now - g.lastTime <= kMergeWindowMs) {
-        g.repeat += amount;
-    } else {
-        g.repeat = amount;
-    }
-    g.lastLabel = label;
-    g.lastGlyph = glyph;
-    g.lastTime = now;
-#ifdef INPUTLENS_METRICS
-    ++g.shown;
-#endif
-    g.overlay.Show(label, glyph, g.repeat > 1 ? L" ×" + std::to_wstring(g.repeat) : std::wstring());
+    const uint8_t tracked = g.tracker.Modifiers();
+    if (tracked != 0) g.tracker.Reconcile(HeldModifiers(tracked));
 }
 
 void HandleKeyboard(const RAWKEYBOARD& kb) {
-    UINT vk = kb.VKey;
-    const bool extended = (kb.Flags & RI_KEY_E0) != 0;
-    const bool up = (kb.Flags & RI_KEY_BREAK) != 0;
-    // 0xFF and extended Shift are synthetic scan codes emitted around other keys.
-    if (vk == 0 || vk == 0xFF || (vk == VK_SHIFT && extended)) return;
-    if (vk == VK_LCONTROL || vk == VK_RCONTROL) vk = VK_CONTROL;
-    if (vk == VK_LMENU || vk == VK_RMENU) vk = VK_MENU;
-    if (vk == VK_LSHIFT || vk == VK_RSHIFT) vk = VK_SHIFT;
-
-    if (bool* flag = ModifierFlag(vk)) {
-        if (!up) {
-            if (*flag) return;  // Auto-repeat of a held modifier.
-            const bool first = !(g.ctrl || g.alt || g.shift || g.win);
-            *flag = true;
-            g.tapCandidate = first ? vk : 0;
-            g.tapStart = GetTickCount64();
-        } else {
-            *flag = false;
-            // A modifier alone shows on release, so capitals typed with Shift stay silent.
-            if (g.tapCandidate == vk && GetTickCount64() - g.tapStart <= kModifierTapMs) {
-                Present(ModifierName(vk));
-            }
-            g.tapCandidate = 0;
-        }
-        return;
-    }
-
-    if (up) return;
-    g.tapCandidate = 0;
-    ReconcileModifiers();
-
-    if (g.ctrl || g.alt || g.win) {
-        Present(ModifierPrefix() + ComboKeyLabel(vk, extended));
-    } else if (const wchar_t* label = StandaloneKeyLabel(vk, extended)) {
-        Present(ModifierPrefix() + label);
-    }
-    // Anything else is ordinary typing. It is dropped here and never stored.
+    const auto event = TranslateKey(kb.VKey, (kb.Flags & RI_KEY_E0) != 0, (kb.Flags & RI_KEY_BREAK) != 0);
+    if (!event) return;
+    if (event->down && event->key > inputlens::Key::Meta) ReconcileModifiers();
+    Present(g.tracker.OnKey(*event, GetTickCount64()));
 }
 
 void HandleMouse(const RAWMOUSE& mouse) {
     const USHORT flags = mouse.usButtonFlags;
-    g.tapCandidate = 0;
+    const ULONGLONG now = GetTickCount64();
+    g.tracker.CancelTap();
     ReconcileModifiers();
-    const std::wstring prefix = ModifierPrefix();
-    if (flags & RI_MOUSE_LEFT_BUTTON_DOWN) Present(prefix, MouseGlyph::Left);
-    if (flags & RI_MOUSE_RIGHT_BUTTON_DOWN) Present(prefix, MouseGlyph::Right);
-    if (flags & RI_MOUSE_MIDDLE_BUTTON_DOWN) Present(prefix, MouseGlyph::Middle);
-    if (flags & RI_MOUSE_BUTTON_4_DOWN) Present(prefix, MouseGlyph::Back);
-    if (flags & RI_MOUSE_BUTTON_5_DOWN) Present(prefix, MouseGlyph::Forward);
+    if (flags & RI_MOUSE_LEFT_BUTTON_DOWN) Present(g.tracker.OnMouseButton(MouseGlyph::Left, now));
+    if (flags & RI_MOUSE_RIGHT_BUTTON_DOWN) Present(g.tracker.OnMouseButton(MouseGlyph::Right, now));
+    if (flags & RI_MOUSE_MIDDLE_BUTTON_DOWN) Present(g.tracker.OnMouseButton(MouseGlyph::Middle, now));
+    if (flags & RI_MOUSE_BUTTON_4_DOWN) Present(g.tracker.OnMouseButton(MouseGlyph::Back, now));
+    if (flags & RI_MOUSE_BUTTON_5_DOWN) Present(g.tracker.OnMouseButton(MouseGlyph::Forward, now));
     if (flags & (RI_MOUSE_WHEEL | RI_MOUSE_HWHEEL)) {
         // Wheel resolution varies, so count notches once the accumulated delta reaches one.
-        g.wheelSum += static_cast<SHORT>(mouse.usButtonData);
-        const int notches = g.wheelSum / WHEEL_DELTA;
-        if (notches != 0) {
-            g.wheelSum -= notches * WHEEL_DELTA;
-            const bool horizontal = (flags & RI_MOUSE_HWHEEL) != 0;
-            const MouseGlyph glyph = horizontal ? (notches > 0 ? MouseGlyph::WheelRight : MouseGlyph::WheelLeft)
-                                                : (notches > 0 ? MouseGlyph::WheelUp : MouseGlyph::WheelDown);
-            Present(prefix, glyph, notches > 0 ? notches : -notches);
-        }
+        const bool horizontal = (flags & RI_MOUSE_HWHEEL) != 0;
+        int& sum = horizontal ? g.hwheelSum : g.wheelSum;
+        sum += static_cast<SHORT>(mouse.usButtonData);
+        const int notches = sum / WHEEL_DELTA;
+        sum -= notches * WHEEL_DELTA;
+        Present(g.tracker.OnWheel(notches, horizontal, now));
     }
 }
 
 void HandleRawInput(HRAWINPUT handle) {
-#ifdef INPUTLENS_METRICS
-    LARGE_INTEGER begin, end;
-    QueryPerformanceCounter(&begin);
-    ++g.inputs;
-#endif
     RAWINPUT raw;
     UINT size = sizeof(raw);
     if (GetRawInputData(handle, RID_INPUT, &raw, &size, sizeof(RAWINPUTHEADER)) != UINT(-1)) {
@@ -205,24 +105,10 @@ void HandleRawInput(HRAWINPUT handle) {
             if (raw.data.mouse.usButtonFlags != 0) {
                 HandleMouse(raw.data.mouse);
             }
-#ifdef INPUTLENS_METRICS
-            else {
-                ++g.mouseDropped;
-            }
-#endif
         } else if (raw.header.dwType == RIM_TYPEKEYBOARD) {
-#ifdef INPUTLENS_METRICS
-            ++g.keyboardEvents;
-#endif
             HandleKeyboard(raw.data.keyboard);
         }
     }
-#ifdef INPUTLENS_METRICS
-    QueryPerformanceCounter(&end);
-    const long long elapsed = end.QuadPart - begin.QuadPart;
-    g.handlerTicksTotal += elapsed;
-    if (elapsed > g.handlerTicksMax) g.handlerTicksMax = elapsed;
-#endif
 }
 
 void RegisterInput() {
@@ -232,8 +118,7 @@ void RegisterInput() {
     devices[1] = {0x01, 0x02, mouseOn ? DWORD(RIDEV_INPUTSINK) : DWORD(RIDEV_REMOVE), mouseOn ? g.hwnd : nullptr};
     RegisterRawInputDevices(devices, 2, sizeof(RAWINPUTDEVICE));
     if (g.paused) {
-        g.ctrl = g.alt = g.shift = g.win = false;
-        g.tapCandidate = 0;
+        g.tracker.ResetModifiers();
         g.overlay.Hide();
     }
 }
@@ -309,25 +194,6 @@ void ShowTrayMenu(POINT at) {
     }
 }
 
-#ifdef INPUTLENS_METRICS
-void WriteMetrics() {
-    if (g.metricsPath.empty()) return;
-    FILE* file = nullptr;
-    if (_wfopen_s(&file, g.metricsPath.c_str(), L"w") != 0 || !file) return;
-    LARGE_INTEGER frequency;
-    QueryPerformanceFrequency(&frequency);
-    const double toUs = 1e6 / static_cast<double>(frequency.QuadPart);
-    fprintf(file,
-            "{\"wm_input\":%llu,\"mouse_dropped\":%llu,\"keyboard_events\":%llu,\"presented\":%llu,"
-            "\"renders\":%llu,\"first_render_ms\":%.1f,\"max_render_ms\":%.1f,"
-            "\"handler_avg_us\":%.3f,\"handler_max_us\":%.1f}\n",
-            g.inputs, g.mouseDropped, g.keyboardEvents, g.shown, g.overlay.RenderCount(),
-            g.overlay.FirstRenderMs(), g.overlay.MaxRenderMs(),
-            g.inputs ? g.handlerTicksTotal * toUs / static_cast<double>(g.inputs) : 0.0,
-            g.handlerTicksMax * toUs);
-    fclose(file);
-}
-#endif
 
 LRESULT CALLBACK MainProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     if (g.taskbarCreated != 0 && msg == g.taskbarCreated) {
@@ -346,9 +212,6 @@ LRESULT CALLBACK MainProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         }
         return 0;
     case WM_DESTROY:
-#ifdef INPUTLENS_METRICS
-        WriteMetrics();
-#endif
         RemoveTrayIcon();
         PostQuitMessage(0);
         return 0;
@@ -363,13 +226,6 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
     HANDLE single = CreateMutexW(nullptr, TRUE, L"Local\\ChojemaInputLens.Instance");
     if (!single || GetLastError() == ERROR_ALREADY_EXISTS) return 0;
 
-#ifdef INPUTLENS_METRICS
-    int argc = 0;
-    if (LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc)) {
-        if (argc >= 3 && wcscmp(argv[1], L"--metrics-file") == 0) g.metricsPath = argv[2];
-        LocalFree(argv);
-    }
-#endif
 
     g.instance = instance;
     g.english = LoadEnglish();

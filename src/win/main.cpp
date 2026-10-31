@@ -21,7 +21,9 @@ constexpr UINT kTrayId = 1;
 constexpr ULONGLONG kMergeWindowMs = 700;
 constexpr ULONGLONG kModifierTapMs = 1000;
 
-enum MenuId : UINT { kMenuPause = 1, kMenuMouse, kMenuAbout, kMenuExit };
+enum MenuId : UINT { kMenuPause = 1, kMenuMouse, kMenuKorean, kMenuEnglish, kMenuAbout, kMenuExit };
+
+constexpr wchar_t kSettingsKey[] = L"Software\\Chojema\\InputLens";
 
 struct App {
     HINSTANCE instance = nullptr;
@@ -31,6 +33,7 @@ struct App {
     Overlay overlay;
     bool paused = false;
     bool showMouse = true;
+    bool english = false;
 
     bool ctrl = false, alt = false, shift = false, win = false;
     UINT tapCandidate = 0;
@@ -49,6 +52,26 @@ struct App {
     long long handlerTicksTotal = 0, handlerTicksMax = 0;
 #endif
 } g;
+
+const wchar_t* T(const wchar_t* korean, const wchar_t* english) { return g.english ? english : korean; }
+
+// A saved choice wins. Otherwise English Windows gets English and everything else Korean.
+bool LoadEnglish() {
+    wchar_t value[8]{};
+    DWORD size = sizeof(value);
+    if (RegGetValueW(HKEY_CURRENT_USER, kSettingsKey, L"Language", RRF_RT_REG_SZ, nullptr, value, &size) == ERROR_SUCCESS) {
+        return wcscmp(value, L"en") == 0;
+    }
+    return PRIMARYLANGID(GetUserDefaultUILanguage()) == LANG_ENGLISH;
+}
+
+void SetLanguage(bool english) {
+    g.english = english;
+    SetKeyLabelsEnglish(english);
+    const wchar_t* value = english ? L"en" : L"ko";
+    RegSetKeyValueW(HKEY_CURRENT_USER, kSettingsKey, L"Language", REG_SZ, value,
+                    static_cast<DWORD>((wcslen(value) + 1) * sizeof(wchar_t)));
+}
 
 bool* ModifierFlag(UINT vk) {
     switch (vk) {
@@ -236,21 +259,24 @@ void RemoveTrayIcon() {
 }
 
 void ShowAbout() {
-    const std::wstring text = std::wstring(kAppName) + L" " + INPUTLENS_VERSION_WSTRING +
-                              L"\n\n"
-                              L"입력한 내용을 저장하거나 전송하지 않습니다.\n"
-                              L"Input is never stored or sent anywhere.\n\n"
-                              L"Copyright (c) 2026 Chulwoo Park";
-    MessageBoxW(g.hwnd, text.c_str(), L"정보(About)", MB_OK | MB_ICONINFORMATION);
+    const std::wstring text = std::wstring(kAppName) + L" " + INPUTLENS_VERSION_WSTRING + L"\n\n" +
+                              T(L"입력한 내용을 저장하거나 전송하지 않습니다.", L"Input is never stored or sent anywhere.") +
+                              L"\n\nCopyright (c) 2026 Chulwoo Park";
+    MessageBoxW(g.hwnd, text.c_str(), T(L"정보", L"About"), MB_OK | MB_ICONINFORMATION);
 }
 
 void ShowTrayMenu(POINT at) {
+    HMENU languages = CreatePopupMenu();
+    AppendMenuW(languages, MF_STRING | (g.english ? 0 : MF_CHECKED), kMenuKorean, L"한국어");
+    AppendMenuW(languages, MF_STRING | (g.english ? MF_CHECKED : 0), kMenuEnglish, L"English");
+
     HMENU menu = CreatePopupMenu();
-    AppendMenuW(menu, MF_STRING | (g.paused ? MF_CHECKED : 0), kMenuPause, L"일시정지(Pause)");
-    AppendMenuW(menu, MF_STRING | (g.showMouse ? MF_CHECKED : 0), kMenuMouse, L"마우스 표시(Show mouse)");
+    AppendMenuW(menu, MF_STRING | (g.paused ? MF_CHECKED : 0), kMenuPause, T(L"일시정지", L"Pause"));
+    AppendMenuW(menu, MF_STRING | (g.showMouse ? MF_CHECKED : 0), kMenuMouse, T(L"마우스 표시", L"Show mouse"));
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(menu, MF_STRING, kMenuAbout, L"정보(About)");
-    AppendMenuW(menu, MF_STRING, kMenuExit, L"종료(Exit)");
+    AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(languages), T(L"언어", L"Language"));
+    AppendMenuW(menu, MF_STRING, kMenuAbout, T(L"정보", L"About"));
+    AppendMenuW(menu, MF_STRING, kMenuExit, T(L"종료", L"Exit"));
 
     SetForegroundWindow(g.hwnd);  // Required so the menu closes on an outside click.
     const UINT id = TrackPopupMenuEx(menu, TPM_RETURNCMD | TPM_NONOTIFY | TPM_RIGHTBUTTON, at.x, at.y, g.hwnd, nullptr);
@@ -265,6 +291,12 @@ void ShowTrayMenu(POINT at) {
     case kMenuMouse:
         g.showMouse = !g.showMouse;
         RegisterInput();
+        break;
+    case kMenuKorean:
+        SetLanguage(false);
+        break;
+    case kMenuEnglish:
+        SetLanguage(true);
         break;
     case kMenuAbout:
         ShowAbout();
@@ -340,6 +372,8 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
 #endif
 
     g.instance = instance;
+    g.english = LoadEnglish();
+    SetKeyLabelsEnglish(g.english);
     g.taskbarCreated = RegisterWindowMessageW(L"TaskbarCreated");
     g.icon = static_cast<HICON>(LoadImageW(instance, MAKEINTRESOURCEW(IDI_APP), IMAGE_ICON,
                                            GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), 0));

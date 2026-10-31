@@ -2,6 +2,8 @@
 #include <string>
 #include <windows.h>
 
+void SetKeyLabelsEnglish(bool english);
+
 // Label for a key shown on its own: function, navigation and IME keys.
 // Returns nullptr for keys that produce text, which are not shown by themselves.
 const wchar_t* StandaloneKeyLabel(UINT vk, bool extended);

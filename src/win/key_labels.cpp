@@ -1,5 +1,11 @@
 #include "key_labels.h"
 
+namespace {
+bool g_english = false;
+}
+
+void SetKeyLabelsEnglish(bool english) { g_english = english; }
+
 const wchar_t* StandaloneKeyLabel(UINT vk, bool extended) {
     static const wchar_t* const kFunctionKeys[] = {
         L"F1",  L"F2",  L"F3",  L"F4",  L"F5",  L"F6",  L"F7",  L"F8",
@@ -31,8 +37,8 @@ const wchar_t* StandaloneKeyLabel(UINT vk, bool extended) {
     case VK_CAPITAL: return L"Caps Lock";
     case VK_NUMLOCK: return L"Num Lock";
     case VK_SCROLL: return L"Scroll Lock";
-    case VK_HANGUL: return L"한/영";
-    case VK_HANJA: return L"한자";
+    case VK_HANGUL: return g_english ? L"Han/Eng" : L"한/영";
+    case VK_HANJA: return g_english ? L"Hanja" : L"한자";
     default: return nullptr;
     }
 }

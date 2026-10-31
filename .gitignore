@@ -3,7 +3,9 @@
 !/.gitignore
 !/.gitattributes
 !/README.md
+!/README.en.md
 !/CHANGELOG.md
+!/CHANGELOG.en.md
 !/LICENSE
 !/CMakeLists.txt
 !/CMakePresets.json

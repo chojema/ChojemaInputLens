@@ -31,5 +31,5 @@ target_compile_definitions(ChojemaInputLens PRIVATE
 target_compile_options(ChojemaInputLens PRIVATE
     $<$<COMPILE_LANGUAGE:CXX>:/utf-8 /W4 /permissive- /GR->
 )
-target_link_libraries(ChojemaInputLens PRIVATE user32 gdi32 gdiplus shell32 shcore)
+target_link_libraries(ChojemaInputLens PRIVATE user32 gdi32 gdiplus shell32 shcore advapi32)
 set_property(TARGET ChojemaInputLens PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)

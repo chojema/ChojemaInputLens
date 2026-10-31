@@ -6,7 +6,13 @@
 
 <p align="center"><a href="README.md">한국어</a> | <strong>English</strong></p>
 
-> Early development. No public release yet. Only the Windows version exists for now.
+> Early development. Only the Windows x64 version exists for now.
+
+## Download
+
+Get the ZIP file from the [latest release](https://github.com/chojema/ChojemaInputLens/releases/latest) and extract it. No installation or administrator rights are needed.
+
+The app is not code-signed, so Windows SmartScreen may warn you on first run. Choose **More info**, then **Run anyway**.
 
 ## What it shows
 

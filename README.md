@@ -6,7 +6,13 @@
 
 <p align="center"><strong>한국어</strong> | <a href="README.en.md">English</a></p>
 
-> 개발 초기 단계이며 아직 공개 릴리스가 없습니다. 현재 Windows 버전만 있습니다.
+> 개발 초기 단계입니다. 현재 Windows x64 버전만 있습니다.
+
+## 다운로드
+
+[최신 릴리스](https://github.com/chojema/ChojemaInputLens/releases/latest)에서 ZIP 파일을 받아 압축을 풉니다. 설치와 관리자 권한은 필요 없습니다.
+
+코드 서명이 없어 처음 실행할 때 Windows SmartScreen 경고가 나올 수 있습니다. **추가 정보**에서 **실행**을 누르면 실행됩니다.
 
 ## 표시되는 입력
 

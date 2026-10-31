@@ -4,7 +4,7 @@
 
 This project follows [Semantic Versioning](https://semver.org/). The version is set in `project(... VERSION ...)` in `CMakeLists.txt`, and release tags look like `v0.1.0`.
 
-## [0.1.0] - Unreleased
+## [0.1.0] - 2026-10-31
 
 ### Added
 

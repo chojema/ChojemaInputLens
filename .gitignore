@@ -1,0 +1,12 @@
+# Allowlist: only what users need is published.
+/*
+!/.gitignore
+!/.gitattributes
+!/README.md
+!/CHANGELOG.md
+!/LICENSE
+!/CMakeLists.txt
+!/CMakePresets.json
+!/src/
+!/assets/
+*_Conflict*

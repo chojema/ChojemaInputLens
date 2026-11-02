@@ -6,6 +6,13 @@ This project follows [Semantic Versioning](https://semver.org/). The version is 
 
 ## [0.1.0] - 2026-10-31
 
+### macOS distribution added - 2026-11-02
+
+- Universal app for Apple Silicon and Intel Macs running macOS 12 or later.
+- Menu bar controls, Input Monitoring permission guidance, Cmd and Option shortcuts, mouse images and a click-through overlay.
+- Korean and English interfaces, pause, mouse visibility toggle and automatic hiding.
+- DMG and ZIP distribution without Apple distribution signing or notarization.
+
 ### Added
 
 - Briefly shows key combinations, function keys and mouse input on Windows.

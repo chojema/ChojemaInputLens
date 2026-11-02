@@ -2,7 +2,7 @@
 
 <h1 align="center">Chojema InputLens</h1>
 
-<p align="center">A lightweight tray app that briefly shows your key and mouse input on screen</p>
+<p align="center">A lightweight on-screen display (OSD) app that briefly shows your key and mouse input</p>
 
 <p align="center"><a href="README.md">한국어</a> | <strong>English</strong></p>
 

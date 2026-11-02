@@ -2,7 +2,7 @@
 
 <h1 align="center">Chojema InputLens</h1>
 
-<p align="center">누른 키와 마우스 입력을 화면에 잠깐 보여 주는 가벼운 상주 앱</p>
+<p align="center">누른 키와 마우스 입력을 화면에 잠깐 보여 주는 가벼운 입력 표시(OSD) 앱</p>
 
 <p align="center"><strong>한국어</strong> | <a href="README.en.md">English</a></p>
 
